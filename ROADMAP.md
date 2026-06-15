@@ -8,6 +8,18 @@ comment, or pick one up.
 The active milestone is
 [**v1.1.0**](https://github.com/boschma1/NotepadMacMac/milestone/1).
 
+## Shipped in v1.3.0
+
+See the [v1.3.0 release notes](https://github.com/boschma1/NotepadMacMac/releases/tag/v1.3.0).
+
+- [**Developer ID signing + notarization**](https://github.com/boschma1/NotepadMacMac/issues/2)
+  — the release `.app` is signed with the official Developer ID
+  Application certificate, runs under the hardened runtime, and is
+  notarized + stapled by Apple. No more Gatekeeper warning, no more
+  `xattr -dr com.apple.quarantine` workaround.
+- Release tooling: `scripts/release.sh` integrates signing,
+  notarization, and stapling end-to-end.
+
 ## Shipped in v1.2.0
 
 See the [v1.2.0 release notes](https://github.com/boschma1/NotepadMacMac/releases/tag/v1.2.0)
@@ -48,7 +60,7 @@ for the full feature list. Highlights:
 | #   | Item                                                                                          | Area          |
 | --- | --------------------------------------------------------------------------------------------- | ------------- |
 | [#1](https://github.com/boschma1/NotepadMacMac/issues/1) | Universal (arm64 + x86_64) build (✅ shipped in v1.2.0) | Distribution  |
-| [#2](https://github.com/boschma1/NotepadMacMac/issues/2) | Developer ID signing + notarization        | Distribution  |
+| [#2](https://github.com/boschma1/NotepadMacMac/issues/2) | Developer ID signing + notarization (✅ shipped in v1.3.0) | Distribution  |
 | [#3](https://github.com/boschma1/NotepadMacMac/issues/3) | Homebrew cask                              | Distribution  |
 | [#4](https://github.com/boschma1/NotepadMacMac/issues/4) | Document the plugin API                    | Plugins       |
 | [#5](https://github.com/boschma1/NotepadMacMac/issues/5) | More built-in language definitions         | Languages     |
@@ -57,8 +69,9 @@ for the full feature list. Highlights:
 ### Notes
 
 - **Universal binary** unblocks Intel Mac users; shipped in v1.2.0.
-- **Signing + notarization** removes the Gatekeeper warning on first
-  launch and is a prerequisite for the Homebrew cask.
+- **Signing + notarization** removed the Gatekeeper warning on first
+  launch and is a prerequisite for the Homebrew cask; shipped in
+  v1.3.0.
 - **Plugin API documentation** turns the existing `PluginManager`
   extension point into something third parties can target safely.
 - **More languages**: HTML / XML / YAML / TOML / plist / GraphQL /
