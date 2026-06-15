@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# release.sh — build, tag, push, and ship a NotepadMacMac release.
+# release.sh — build, sign, notarize, tag, push, and ship a NotepadMacMac release.
 #
 # Workflow:
 #   1. Bump the version in BOTH Info.plist and AppConfig.swift (must match).
@@ -14,7 +14,13 @@
 #     (SwiftPM produces a universal Mach-O at
 #     .build/apple/Products/Release/NotepadMacMac).
 #   - Verify the resulting binary contains both arm64 and x86_64 slices.
-#   - Copy the binary into NotepadMacMac.app and re-codesign ad-hoc.
+#   - Copy the binary into NotepadMacMac.app and codesign with the
+#     Developer ID Application identity + hardened runtime + secure
+#     timestamp (or ad-hoc with --ad-hoc).
+#   - Package the bundle as a .zip and submit it to Apple's notary
+#     service with `notarytool submit --wait`, then staple the ticket
+#     onto the .app and re-zip from the stapled bundle. The committed
+#     in-tree bundle therefore includes the staple ticket.
 #   - Stage everything, show a confirmation, then commit + tag + push.
 #   - Create a GitHub release with two assets:
 #       NotepadMacMac-v<version>-macOS-universal.zip  (versioned, archival)
@@ -24,6 +30,9 @@
 #
 # Stable download URL that always points at the newest release:
 #   https://github.com/boschma1/NotepadMacMac/releases/latest/download/NotepadMacMac-latest.zip
+#
+# First-time signing/notarization setup is documented in README.md
+# under "Signing and notarization (first-time setup)".
 
 set -euo pipefail
 
@@ -32,14 +41,27 @@ usage() {
 Usage: scripts/release.sh [options]
 
 Options:
-  -m, --message MSG     Commit + tag message (default: "Release vX.Y.Z").
-  -t, --title TITLE     GitHub release title (default: "vX.Y.Z").
-  -n, --notes-file PATH Markdown file with release notes
-                        (default: use the commit message).
-  -y, --yes             Skip the interactive confirmation.
-      --dry-run         Build and stage everything, but don't commit,
-                        tag, push, or create the release.
-  -h, --help            Show this help and exit.
+  -m, --message MSG       Commit + tag message (default: "Release vX.Y.Z").
+  -t, --title TITLE       GitHub release title (default: "vX.Y.Z").
+  -n, --notes-file PATH   Markdown file with release notes
+                          (default: use the commit message).
+  -y, --yes               Skip the interactive confirmation.
+      --dry-run           Build, sign, and (optionally) notarize, but
+                          don't commit, tag, push, or create the release.
+      --ad-hoc            Skip Developer ID signing and notarization;
+                          fall back to the old ad-hoc signing flow.
+                          Useful for local testing without burning
+                          notary submissions. Implies --no-notarize.
+      --no-notarize       Sign with Developer ID but skip submission to
+                          Apple's notary service and stapling. Useful
+                          for offline / quick test builds.
+      --sign-identity ID  Codesign identity string (default:
+                          $NOTEPAD_SIGN_IDENTITY, else auto-detected
+                          from the keychain).
+      --notary-profile P  notarytool keychain profile name (default:
+                          $NOTEPAD_NOTARY_PROFILE, else
+                          "notepadmacmac-notary").
+  -h, --help              Show this help and exit.
 
 Version is read from NotepadMacMac.app/Contents/Info.plist
 (CFBundleShortVersionString). AppConfig.swift must agree.
@@ -51,15 +73,23 @@ COMMIT_MESSAGE=""
 RELEASE_TITLE=""
 ASSUME_YES=0
 DRY_RUN=0
+SIGN_MODE="developer_id"   # or "ad_hoc"
+NOTARIZE=1
+SIGN_IDENTITY="${NOTEPAD_SIGN_IDENTITY:-}"
+NOTARY_PROFILE="${NOTEPAD_NOTARY_PROFILE:-notepadmacmac-notary}"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        -m|--message)    COMMIT_MESSAGE="$2"; shift 2;;
-        -t|--title)      RELEASE_TITLE="$2";  shift 2;;
-        -n|--notes-file) NOTES_FILE="$2";     shift 2;;
-        -y|--yes)        ASSUME_YES=1;        shift;;
-        --dry-run)       DRY_RUN=1;           shift;;
-        -h|--help)       usage; exit 0;;
+        -m|--message)      COMMIT_MESSAGE="$2"; shift 2;;
+        -t|--title)        RELEASE_TITLE="$2";  shift 2;;
+        -n|--notes-file)   NOTES_FILE="$2";     shift 2;;
+        -y|--yes)          ASSUME_YES=1;        shift;;
+        --dry-run)         DRY_RUN=1;           shift;;
+        --ad-hoc)          SIGN_MODE="ad_hoc"; NOTARIZE=0; shift;;
+        --no-notarize)     NOTARIZE=0;          shift;;
+        --sign-identity)   SIGN_IDENTITY="$2";  shift 2;;
+        --notary-profile)  NOTARY_PROFILE="$2"; shift 2;;
+        -h|--help)         usage; exit 0;;
         *) echo "Unknown argument: $1" >&2; usage >&2; exit 2;;
     esac
 done
@@ -74,6 +104,7 @@ command -v gh >/dev/null    || { echo "ERROR: gh CLI not installed."  >&2; exit 
 command -v swift >/dev/null || { echo "ERROR: swift not installed." >&2; exit 1; }
 command -v ditto >/dev/null || { echo "ERROR: ditto not installed." >&2; exit 1; }
 command -v lipo >/dev/null  || { echo "ERROR: lipo not installed."   >&2; exit 1; }
+command -v xcrun >/dev/null || { echo "ERROR: xcrun not installed."  >&2; exit 1; }
 
 INFO_PLIST="NotepadMacMac.app/Contents/Info.plist"
 APP_CONFIG="Sources/NotepadMacMac/Config/AppConfig.swift"
@@ -115,6 +146,51 @@ if [[ -n "$NOTES_FILE" && ! -f "$NOTES_FILE" ]]; then
     exit 1
 fi
 
+# --- Resolve signing identity ------------------------------------------------
+if [[ "$SIGN_MODE" == "developer_id" ]]; then
+    if [[ -z "$SIGN_IDENTITY" ]]; then
+        # Auto-detect: take the first Developer ID Application identity.
+        SIGN_IDENTITY="$(
+            security find-identity -v -p codesigning 2>/dev/null \
+            | awk -F'"' '/Developer ID Application/ {print $2; exit}'
+        )"
+    fi
+    if [[ -z "$SIGN_IDENTITY" ]]; then
+        cat >&2 <<EOF
+ERROR: no Developer ID Application identity found in the keychain, and
+       none was supplied via --sign-identity / \$NOTEPAD_SIGN_IDENTITY.
+
+       Run the first-time setup documented in README.md
+       ("Signing and notarization (first-time setup)") to install the
+       Developer ID Application certificate, or re-run with --ad-hoc
+       for an unsigned local build.
+EOF
+        exit 1
+    fi
+    echo "→ Signing identity: $SIGN_IDENTITY"
+fi
+
+if [[ "$NOTARIZE" -eq 1 ]]; then
+    # Verify the notarytool keychain profile exists. `notarytool history`
+    # is a cheap call that fails fast if credentials aren't stored.
+    if ! xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1; then
+        cat >&2 <<EOF
+ERROR: notarytool keychain profile "$NOTARY_PROFILE" is missing or invalid.
+
+       Store credentials once with:
+         xcrun notarytool store-credentials "$NOTARY_PROFILE" \\
+             --apple-id   <your-apple-id> \\
+             --team-id    <TEAMID10> \\
+             --password   <app-specific-password>
+
+       Or re-run with --notary-profile <name> / --no-notarize.
+       See README.md ("Signing and notarization (first-time setup)").
+EOF
+        exit 1
+    fi
+    echo "→ Notary profile  : $NOTARY_PROFILE"
+fi
+
 # --- Build -------------------------------------------------------------------
 echo "→ Building NotepadMacMac $TAG (release, universal: arm64 + x86_64)…"
 swift build -c release --arch arm64 --arch x86_64
@@ -132,15 +208,55 @@ if ! [[ "$ARCHS" == *"arm64"* && "$ARCHS" == *"x86_64"* ]]; then
 fi
 echo "  ✓ universal binary: $ARCHS"
 
-echo "→ Refreshing app bundle and re-signing ad-hoc…"
+# --- Refresh bundle + sign ---------------------------------------------------
 cp -f "$BUILT_BIN" NotepadMacMac.app/Contents/MacOS/NotepadMacMac
-codesign --force --deep --sign - NotepadMacMac.app >/dev/null
+
+if [[ "$SIGN_MODE" == "developer_id" ]]; then
+    echo "→ Codesigning with Developer ID + hardened runtime + timestamp…"
+    codesign --force --deep --options runtime --timestamp \
+        --sign "$SIGN_IDENTITY" NotepadMacMac.app
+    codesign --verify --deep --strict --verbose=2 NotepadMacMac.app
+else
+    echo "→ Codesigning ad-hoc (will trigger Gatekeeper on first launch)…"
+    codesign --force --deep --sign - NotepadMacMac.app >/dev/null
+fi
 
 BUNDLE_ARCHS="$(lipo -archs NotepadMacMac.app/Contents/MacOS/NotepadMacMac)"
 if ! [[ "$BUNDLE_ARCHS" == *"arm64"* && "$BUNDLE_ARCHS" == *"x86_64"* ]]; then
     echo "ERROR: bundled binary lost a slice after codesign (got: $BUNDLE_ARCHS)." >&2
     exit 1
 fi
+
+# --- Package -----------------------------------------------------------------
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+VERSIONED_ZIP="$TMP/NotepadMacMac-$TAG-macOS-universal.zip"
+LATEST_ZIP="$TMP/NotepadMacMac-latest.zip"
+
+echo "→ Packaging zip for notarization / release…"
+ditto -c -k --sequesterRsrc --keepParent NotepadMacMac.app "$VERSIONED_ZIP"
+
+# --- Notarize + staple -------------------------------------------------------
+if [[ "$NOTARIZE" -eq 1 ]]; then
+    echo "→ Submitting to Apple notary service (this can take a few minutes)…"
+    xcrun notarytool submit "$VERSIONED_ZIP" \
+        --keychain-profile "$NOTARY_PROFILE" \
+        --wait
+
+    echo "→ Stapling notarization ticket onto NotepadMacMac.app…"
+    xcrun stapler staple NotepadMacMac.app
+    xcrun stapler validate NotepadMacMac.app
+
+    echo "→ Gatekeeper assessment:"
+    spctl --assess --type execute --verbose=4 NotepadMacMac.app
+
+    echo "→ Re-packaging zip from stapled bundle…"
+    rm -f "$VERSIONED_ZIP"
+    ditto -c -k --sequesterRsrc --keepParent NotepadMacMac.app "$VERSIONED_ZIP"
+fi
+
+cp "$VERSIONED_ZIP" "$LATEST_ZIP"
 
 # --- Stage + confirm ---------------------------------------------------------
 git add -A
@@ -152,6 +268,8 @@ echo "=========================================================="
 echo "  Commit message : $COMMIT_MESSAGE"
 echo "  Release title  : $RELEASE_TITLE"
 echo "  Notes          : ${NOTES_FILE:-(commit message)}"
+echo "  Sign mode      : $SIGN_MODE"
+echo "  Notarized      : $([[ $NOTARIZE -eq 1 ]] && echo yes || echo no)"
 echo "  Dry run        : $([[ $DRY_RUN -eq 1 ]] && echo yes || echo no)"
 echo
 echo "Staged changes:"
@@ -160,6 +278,9 @@ echo
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
     echo "→ Dry-run; not committing, tagging, pushing, or releasing."
+    echo "  Built zip: $VERSIONED_ZIP"
+    # Keep TMP around so the user can inspect the artifact.
+    trap - EXIT
     exit 0
 fi
 
@@ -180,17 +301,6 @@ git push origin main
 
 echo "→ git push origin ${TAG}…"
 git push origin "$TAG"
-
-# --- Build release zips ------------------------------------------------------
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
-
-VERSIONED_ZIP="$TMP/NotepadMacMac-$TAG-macOS-universal.zip"
-LATEST_ZIP="$TMP/NotepadMacMac-latest.zip"
-
-echo "→ Packaging zips…"
-ditto -c -k --sequesterRsrc --keepParent NotepadMacMac.app "$VERSIONED_ZIP"
-cp "$VERSIONED_ZIP" "$LATEST_ZIP"
 
 # --- Create GitHub release ---------------------------------------------------
 GH_ARGS=( "--title" "$RELEASE_TITLE" )

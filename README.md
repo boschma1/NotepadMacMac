@@ -109,13 +109,17 @@ plist, GraphQL, etc.).
      asset attached to that release.
 
 2. Unzip and drag **NotepadMacMac.app** into `/Applications`.
-3. Because the build is **ad-hoc signed (not notarized)**, the first launch
-   will be blocked by Gatekeeper. Either right-click → **Open** the first
-   time, or remove the quarantine attribute:
+3. Releases from v1.1.0 onward are **signed with a Developer ID
+   Application certificate and notarized by Apple**, so the app
+   launches with no Gatekeeper prompt on macOS 13+.
 
-   ```sh
-   xattr -dr com.apple.quarantine /Applications/NotepadMacMac.app
-   ```
+   > Older builds (≤ v1.2.0) are ad-hoc signed. If you're on one of
+   > those, either right-click → **Open** the first time, or remove
+   > the quarantine attribute:
+   >
+   > ```sh
+   > xattr -dr com.apple.quarantine /Applications/NotepadMacMac.app
+   > ```
 
 ### Build from source
 
@@ -136,7 +140,8 @@ open NotepadMacMac.app
 
 ## Cutting a release
 
-The whole release flow — build, refresh the in-tree `.app` bundle, codesign,
+The whole release flow — build, refresh the in-tree `.app` bundle, codesign
+with the Developer ID Application identity, notarize and staple the bundle,
 commit, tag, push, and create the GitHub release with both a versioned
 asset and the stable `NotepadMacMac-latest.zip` — is wrapped up in a single
 script:
@@ -156,14 +161,66 @@ script:
 
 The script verifies that both version strings agree, that the tag doesn't
 already exist locally or on the remote, builds the release binary, refreshes
-the bundle and re-signs it ad-hoc, shows a summary, and on confirmation
-commits + tags + pushes + creates the GitHub release with both:
+the bundle, codesigns it (with the hardened runtime + secure timestamp),
+submits the zip to Apple's notary service, staples the ticket onto the
+bundle, re-zips, shows a summary, and on confirmation commits + tags +
+pushes + creates the GitHub release with both:
 
 - `NotepadMacMac-vX.Y.Z-macOS-universal.zip` (versioned, archival)
 - `NotepadMacMac-latest.zip` (stable, served from the always-latest URL)
 
-Use `--dry-run` to validate everything and rebuild the bundle without
-publishing, and `--yes` to skip the interactive confirmation.
+Useful flags:
+
+- `--dry-run` — build, sign, and notarize, but don't commit / tag / push /
+  publish. The built zip path is printed so you can inspect it.
+- `--yes` — skip the interactive confirmation.
+- `--no-notarize` — sign with Developer ID but skip the notary submission
+  (faster for offline test builds; the resulting zip will NOT pass
+  Gatekeeper on a fresh machine).
+- `--ad-hoc` — fall back to the pre-v1.1.0 ad-hoc signing flow (no
+  Developer ID, no notarization). Implies `--no-notarize`.
+
+### Signing and notarization (first-time setup)
+
+The release script needs two things in place on the machine running it:
+
+1. **A Developer ID Application certificate** installed in the login
+   keychain. The easiest way to provision one is via Xcode:
+
+   - Open **Xcode → Settings → Accounts**, sign in with the Apple ID
+     attached to your Apple Developer Program membership.
+   - Select the team, click **Manage Certificates…**, then **+ → Developer
+     ID Application**. Xcode generates the cert, uploads the CSR to Apple,
+     downloads the signed cert, and installs it in your login keychain.
+   - Confirm it's there:
+
+     ```sh
+     security find-identity -v -p codesigning | grep "Developer ID Application"
+     ```
+
+2. **A notarytool keychain profile** that stores your Apple ID + Team ID +
+   an app-specific password. Create the app-specific password at
+   [appleid.apple.com](https://appleid.apple.com) → **Sign-In and
+   Security → App-Specific Passwords**, then run once:
+
+   ```sh
+   xcrun notarytool store-credentials notepadmacmac-notary \
+       --apple-id   <your-apple-id-email> \
+       --team-id    <TEAMID10> \
+       --password   <app-specific-password>
+   ```
+
+   Verify the profile works:
+
+   ```sh
+   xcrun notarytool history --keychain-profile notepadmacmac-notary
+   ```
+
+The script auto-detects the first `Developer ID Application` identity in
+the keychain and defaults the notary profile name to `notepadmacmac-notary`.
+Override either with `--sign-identity` / `--notary-profile` on the command
+line, or with the `NOTEPAD_SIGN_IDENTITY` / `NOTEPAD_NOTARY_PROFILE`
+environment variables.
 
 ## Project layout
 
