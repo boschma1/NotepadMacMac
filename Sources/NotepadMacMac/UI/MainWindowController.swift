@@ -100,6 +100,13 @@ class MainWindowController: NSWindowController, NSTextViewDelegate {
         wordCompleter = WordCompleter(textView: textView)
         splitViewManager = SplitViewManager(mainController: self)
 
+        // Re-render Markdown live preview as the caret moves so the active
+        // line reveals its raw markers and others stay rendered.
+        NotificationCenter.default.addObserver(forName: NSTextView.didChangeSelectionNotification,
+                                               object: textView, queue: .main) { [weak self] _ in
+            self?.markdownLivePreviewSelectionChanged()
+        }
+
         // Listen for theme changes
         ThemeManager.shared.onThemeChanged = { [weak self] theme in
             self?.applyEditorTheme(theme)
@@ -269,6 +276,18 @@ class MainWindowController: NSWindowController, NSTextViewDelegate {
 
         // Save wrap state before endEditing triggers relayout
         let wasWrapping = wordWrapEnabled
+
+        // Obsidian-style live preview: render Markdown inline, hiding markers
+        // everywhere except the caret's line so it stays editable.
+        if language == "Markdown", EditorSettings.markdownLivePreview {
+            let sel = textView.selectedRange()
+            let activeLine: NSRange? = sel.location <= ts.length
+                ? (ts.string as NSString).lineRange(for: NSRange(location: sel.location, length: 0))
+                : nil
+            MarkdownLivePreview.apply(to: ts, range: fullRange, baseFont: defaultFont,
+                                      theme: theme.syntax, activeLineRange: activeLine)
+        }
+
         ts.endEditing()
 
         // Restore wrap state if it was on (endEditing resets container)
@@ -822,6 +841,34 @@ class MainWindowController: NSWindowController, NSTextViewDelegate {
         invisiblesLayoutManager?.showsFormattingMarks = newValue
         textView.needsDisplay = true
     }
+
+    // MARK: - Markdown live preview
+
+    private var lastActiveMarkdownLine = NSRange(location: NSNotFound, length: 0)
+
+    func toggleMarkdownLivePreview() {
+        EditorSettings.markdownLivePreview.toggle()
+        applySyntaxHighlightingPublic()
+    }
+
+    var markdownLivePreviewEnabled: Bool { EditorSettings.markdownLivePreview }
+
+    var isMarkdownDocument: Bool { documentManager.activeDocument?.language == "Markdown" }
+
+    /// Re-render only when the caret crosses into a different line, so markers
+    /// on the line being edited reveal while the rest stay rendered.
+    private func markdownLivePreviewSelectionChanged() {
+        guard isMarkdownDocument, EditorSettings.markdownLivePreview,
+              let ts = textView.textStorage, ts.length < maxHighlightSize else { return }
+        let sel = textView.selectedRange()
+        guard sel.location <= ts.length else { return }
+        let line = (ts.string as NSString).lineRange(for: NSRange(location: sel.location, length: 0))
+        if NSEqualRanges(line, lastActiveMarkdownLine) { return }
+        lastActiveMarkdownLine = line
+        applySyntaxHighlightingPublic()
+    }
+
+    func applySyntaxHighlightingPublic() { applySyntaxHighlighting() }
 
     var showFormattingMarks: Bool {
         EditorSettings.showFormattingMarks

@@ -8,6 +8,15 @@ comment, or pick one up.
 The active milestone is
 [**v1.1.0**](https://github.com/boschma1/NotepadMacMac/milestone/1).
 
+## Shipped in v1.4.0
+
+See the [v1.4.0 release notes](https://github.com/boschma1/NotepadMacMac/releases/tag/v1.4.0).
+
+- **Obsidian-style live Markdown preview** — headings, bold, italic,
+  inline code, and links render inline; the `#`/`**`/backtick/link
+  markers collapse out of view and reveal only on the caret's line.
+  Toggle with View → Markdown Live Preview (⇧⌘M).
+
 ## Shipped in v1.3.0
 
 See the [v1.3.0 release notes](https://github.com/boschma1/NotepadMacMac/releases/tag/v1.3.0).

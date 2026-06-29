@@ -246,6 +246,12 @@ class MenuManager {
         formattingMarks.keyEquivalentModifierMask = [.command, .shift]
         viewMenu.addItem(formattingMarks)
 
+        let livePreview = NSMenuItem(title: "Markdown Live Preview",
+                                     action: #selector(AppDelegate.toggleMarkdownLivePreview(_:)),
+                                     keyEquivalent: "m")
+        livePreview.keyEquivalentModifierMask = [.command, .shift]
+        viewMenu.addItem(livePreview)
+
         viewMenu.addItem(.separator())
 
         viewMenu.addItem(withTitle: "Folder as Workspace",

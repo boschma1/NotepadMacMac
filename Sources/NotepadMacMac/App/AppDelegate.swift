@@ -199,6 +199,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func triggerAutoComplete(_ sender: Any?) { mainController.triggerAutoComplete() }
     @objc func showFindInFiles(_ sender: Any?) { mainController.showFindInFiles() }
     @objc func toggleFormattingMarks(_ sender: Any?) { mainController.toggleFormattingMarks() }
+    @objc func toggleMarkdownLivePreview(_ sender: Any?) { mainController.toggleMarkdownLivePreview() }
     @objc func showAbout(_ sender: Any?) {
         let credits = NSAttributedString(
             string: "Developed by Markus Bosch",
@@ -249,6 +250,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         if menuItem.action == #selector(toggleFormattingMarks(_:)) {
             menuItem.state = EditorSettings.showFormattingMarks ? .on : .off
+        }
+        if menuItem.action == #selector(toggleMarkdownLivePreview(_:)) {
+            menuItem.state = mainController.markdownLivePreviewEnabled ? .on : .off
+            return mainController.isMarkdownDocument
         }
         return true
     }

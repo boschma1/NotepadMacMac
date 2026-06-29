@@ -5,7 +5,7 @@ import Foundation
 struct AppConfig {
     static let appName = "NotepadMacMac"
     static let bundleIdentifier = "com.notepadmacmac.app"
-    static let version = "1.3.0"
+    static let version = "1.4.0"
 
     static var configDirectory: URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -27,6 +27,7 @@ extension Notification.Name {
 /// Lightweight user-defaults-backed editor view settings.
 enum EditorSettings {
     private static let showFormattingMarksKey = "NMM_ShowFormattingMarks"
+    private static let markdownLivePreviewKey = "NMM_MarkdownLivePreview"
     private static let appearanceStyleKey = "NMM_AppearanceStyle"
     private static let transparencyAlphaKey = "NMM_TransparencyAlpha"
 
@@ -37,6 +38,18 @@ enum EditorSettings {
     static var showFormattingMarks: Bool {
         get { UserDefaults.standard.bool(forKey: showFormattingMarksKey) }
         set { UserDefaults.standard.set(newValue, forKey: showFormattingMarksKey) }
+    }
+
+    /// Render Markdown formatting inline (Obsidian-style live preview): hide
+    /// the `**`/`#` markers and show bold, italic, headings, code, and links
+    /// rendered. Markers on the caret's line stay visible so the text remains
+    /// fully editable. Defaults to on.
+    static var markdownLivePreview: Bool {
+        get {
+            if UserDefaults.standard.object(forKey: markdownLivePreviewKey) == nil { return true }
+            return UserDefaults.standard.bool(forKey: markdownLivePreviewKey)
+        }
+        set { UserDefaults.standard.set(newValue, forKey: markdownLivePreviewKey) }
     }
 
     static var appearanceStyle: AppearanceStyle {
