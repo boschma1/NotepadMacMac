@@ -98,6 +98,17 @@ plist, GraphQL, etc.).
 
 ## Installation
 
+### Homebrew (recommended)
+
+```sh
+brew tap boschma1/notepadmacmac
+brew install --cask notepadmacmac
+open -a NotepadMacMac
+```
+
+The cask installs the Developer ID signed, Apple-notarized universal build,
+and `brew upgrade --cask notepadmacmac` keeps it current.
+
 ### Download the release
 
 1. Grab the latest build from
@@ -246,7 +257,6 @@ Highlights:
 
 - [Universal (arm64 + x86_64) builds](https://github.com/boschma1/NotepadMacMac/issues/1)
 - [Developer ID signing and notarization](https://github.com/boschma1/NotepadMacMac/issues/2)
-- [Homebrew cask](https://github.com/boschma1/NotepadMacMac/issues/3)
 - [Plugin API documentation](https://github.com/boschma1/NotepadMacMac/issues/4)
 - [More built-in language definitions](https://github.com/boschma1/NotepadMacMac/issues/5)
 - [Automated test suite](https://github.com/boschma1/NotepadMacMac/issues/6)

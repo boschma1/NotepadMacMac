@@ -1,0 +1,62 @@
+name: Update Homebrew cask
+
+# Bumps the notepadmacmac cask in boschma1/homebrew-notepadmacmac to the
+# version + sha256 of each published release. The universal zip is uploaded
+# by scripts/release.sh, so by the time a release is published the asset is
+# already in place.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to sync (e.g. v1.4.0)"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  update-cask:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve tag and version
+        id: ver
+        run: |
+          TAG="${{ github.event.release.tag_name || github.event.inputs.tag }}"
+          echo "tag=$TAG"            >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}"    >> "$GITHUB_OUTPUT"
+
+      - name: Compute sha256 of the universal zip
+        id: sha
+        run: |
+          TAG="${{ steps.ver.outputs.tag }}"
+          URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/NotepadMacMac-${TAG}-macOS-universal.zip"
+          curl -fsSL "$URL" -o app.zip
+          echo "sha256=$(shasum -a 256 app.zip | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout tap
+        uses: actions/checkout@v4
+        with:
+          repository: boschma1/homebrew-notepadmacmac
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+
+      - name: Update cask
+        run: |
+          CASK=tap/Casks/notepadmacmac.rb
+          sed -i -E "s/^  version \".*\"/  version \"${{ steps.ver.outputs.version }}\"/" "$CASK"
+          sed -i -E "s/^  sha256 \".*\"/  sha256 \"${{ steps.sha.outputs.sha256 }}\"/" "$CASK"
+          cat "$CASK"
+
+      - name: Commit and push
+        run: |
+          cd tap
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "No cask changes."; exit 0
+          fi
+          git commit -am "Update notepadmacmac to ${{ steps.ver.outputs.tag }}"
+          git push

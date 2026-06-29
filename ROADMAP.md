@@ -16,6 +16,9 @@ See the [v1.4.0 release notes](https://github.com/boschma1/NotepadMacMac/release
   inline code, and links render inline; the `#`/`**`/backtick/link
   markers collapse out of view and reveal only on the caret's line.
   Toggle with View → Markdown Live Preview (⇧⌘M).
+- **Homebrew cask** — install with `brew tap boschma1/notepadmacmac &&
+  brew install --cask notepadmacmac`. A release workflow auto-bumps the
+  cask checksum on every release.
 
 ## Shipped in v1.3.0
 
@@ -70,7 +73,7 @@ for the full feature list. Highlights:
 | --- | --------------------------------------------------------------------------------------------- | ------------- |
 | [#1](https://github.com/boschma1/NotepadMacMac/issues/1) | Universal (arm64 + x86_64) build (✅ shipped in v1.2.0) | Distribution  |
 | [#2](https://github.com/boschma1/NotepadMacMac/issues/2) | Developer ID signing + notarization (✅ shipped in v1.3.0) | Distribution  |
-| [#3](https://github.com/boschma1/NotepadMacMac/issues/3) | Homebrew cask                              | Distribution  |
+| [#3](https://github.com/boschma1/NotepadMacMac/issues/3) | Homebrew cask (✅ shipped in v1.4.0)        | Distribution  |
 | [#4](https://github.com/boschma1/NotepadMacMac/issues/4) | Document the plugin API                    | Plugins       |
 | [#5](https://github.com/boschma1/NotepadMacMac/issues/5) | More built-in language definitions         | Languages     |
 | [#6](https://github.com/boschma1/NotepadMacMac/issues/6) | Add an automated test suite                | Tests         |
@@ -81,6 +84,9 @@ for the full feature list. Highlights:
 - **Signing + notarization** removed the Gatekeeper warning on first
   launch and is a prerequisite for the Homebrew cask; shipped in
   v1.3.0.
+- **Homebrew cask** ships via the `boschma1/homebrew-notepadmacmac`
+  tap (`brew install --cask notepadmacmac`); the cask checksum is bumped
+  automatically on each release. Shipped in v1.4.0.
 - **Plugin API documentation** turns the existing `PluginManager`
   extension point into something third parties can target safely.
 - **More languages**: HTML / XML / YAML / TOML / plist / GraphQL /
