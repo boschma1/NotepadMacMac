@@ -8,6 +8,17 @@ comment, or pick one up.
 The active milestone is
 [**v1.1.0**](https://github.com/boschma1/NotepadMacMac/milestone/1).
 
+## Shipped in v1.5.0
+
+See the [v1.5.0 release notes](https://github.com/boschma1/NotepadMacMac/releases/tag/v1.5.0).
+
+- **Rendered Markdown tables** in the live preview — columns are aligned,
+  the `|---|` delimiter row is hidden, the header row is bold, and the
+  pipe separators are dimmed. Alignment is done purely with text
+  attributes (kerning on the monospaced editor font), so the underlying
+  `.md` file is never rewritten. Put the caret on a table row to edit its
+  raw Markdown; move away and it re-aligns.
+
 ## Shipped in v1.4.0
 
 See the [v1.4.0 release notes](https://github.com/boschma1/NotepadMacMac/releases/tag/v1.4.0).

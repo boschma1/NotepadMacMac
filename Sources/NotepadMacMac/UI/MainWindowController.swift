@@ -261,6 +261,10 @@ class MainWindowController: NSWindowController, NSTextViewDelegate {
         ts.beginEditing()
         ts.addAttribute(.foregroundColor, value: theme.foreground, range: fullRange)
         ts.addAttribute(.font, value: defaultFont, range: fullRange)
+        // Clear any column-alignment kerning from a previous pass; the
+        // Markdown table renderer re-adds it below when live preview is on,
+        // so it also disappears cleanly when preview is off or a table is edited.
+        ts.removeAttribute(.kern, range: fullRange)
 
         for rule in rules {
             guard let regex = rule.regex else { continue }
