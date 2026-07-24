@@ -8,6 +8,17 @@ comment, or pick one up.
 The active milestone is
 [**v1.1.0**](https://github.com/boschma1/NotepadMacMac/milestone/1).
 
+## Shipped in v1.5.1
+
+See the [v1.5.1 release notes](https://github.com/boschma1/NotepadMacMac/releases/tag/v1.5.1).
+
+- **Fixed invisible typing in new tabs** — the live-preview renderer hides
+  Markdown markers with a near-zero transparent font. Because the single
+  editor view is reused across tabs, those invisible attributes could leak
+  into a freshly opened tab via the text view's typing attributes, making
+  newly typed characters unreadable. Typing attributes are now reset to the
+  theme defaults whenever a document is loaded.
+
 ## Shipped in v1.5.0
 
 See the [v1.5.0 release notes](https://github.com/boschma1/NotepadMacMac/releases/tag/v1.5.0).

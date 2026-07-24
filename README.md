@@ -5,7 +5,7 @@ ground up in Swift on top of AppKit. NotepadMacMac aims to be the
 quick-to-launch, no-friction scratchpad and code editor that macOS has been
 missing: open a file, edit it, save it, get out.
 
-> **Status:** v1.5.0 — Obsidian-style live Markdown preview with rendered
+> **Status:** v1.5.1 — Obsidian-style live Markdown preview with rendered
 > tables, Developer ID signed and Apple-notarized (universal Apple
 > Silicon + Intel build).
 

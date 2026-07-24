@@ -970,6 +970,17 @@ class MainWindowController: NSWindowController, NSTextViewDelegate {
     private func loadDocumentIntoEditor(_ doc: Document) {
         editorView.language = doc.language
         textView.string = doc.content
+        // Reset typing attributes to clean theme defaults. The single NSTextView
+        // is reused across tabs, and its `typingAttributes` are not reset when the
+        // string changes. Markdown live preview hides markers with a 0.01pt clear
+        // font; if the caret last sat next to a hidden marker, those invisible
+        // attributes would otherwise leak into a freshly opened tab and make typed
+        // characters unreadable.
+        let theme = ThemeManager.shared.currentTheme
+        textView.typingAttributes = [
+            .font: theme.editorFont,
+            .foregroundColor: theme.foreground
+        ]
         if doc.content.count < maxHighlightSize {
             applySyntaxHighlighting()
         }
