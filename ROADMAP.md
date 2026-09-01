@@ -8,6 +8,20 @@ comment, or pick one up.
 The active milestone is
 [**v1.1.0**](https://github.com/boschma1/NotepadMacMac/milestone/1).
 
+## Shipped in v1.5.2
+
+See the [v1.5.2 release notes](https://github.com/boschma1/NotepadMacMac/releases/tag/v1.5.2).
+
+- **Printing (⌘P).** Added a **Print…** item to the File menu bound to ⌘P.
+  Text is laid out to the printable page width and prints black-on-white
+  with automatic pagination, regardless of the editor theme.
+- **Fixed invisible plain-text files.** Opening a `.txt` (or any
+  "Normal Text") file could show nothing but stacked line numbers. Setting
+  the editor's content inherited the near-zero transparent font that
+  Markdown live preview uses to hide markers, and the plain-text path never
+  restored a default font. Every document is now normalized to the theme's
+  default font/color on load.
+
 ## Shipped in v1.5.1
 
 See the [v1.5.1 release notes](https://github.com/boschma1/NotepadMacMac/releases/tag/v1.5.1).

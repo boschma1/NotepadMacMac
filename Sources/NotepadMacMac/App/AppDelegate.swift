@@ -156,6 +156,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     @objc func saveDocument(_ sender: Any?) { mainController.saveCurrentDocument() }
     @objc func saveDocumentAs(_ sender: Any?) { mainController.saveCurrentDocumentAs() }
+    @objc func printDocument(_ sender: Any?) { mainController.printCurrentDocument() }
     @objc func closeTab(_ sender: Any?) { mainController.closeCurrentTab() }
     @objc func duplicateLine(_ sender: Any?) { mainController.editorCommands?.duplicateLine() }
     @objc func deleteLine(_ sender: Any?) { mainController.editorCommands?.deleteLine() }

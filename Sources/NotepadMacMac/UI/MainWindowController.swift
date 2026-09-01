@@ -507,6 +507,45 @@ class MainWindowController: NSWindowController, NSTextViewDelegate {
         }
     }
 
+    /// Print the active document. Lays the text out to the printable page
+    /// width in a throwaway text view (black on white, ignoring the editor
+    /// theme so dark themes still print legibly) and runs a standard print
+    /// panel with automatic pagination.
+    func printCurrentDocument() {
+        let info = NSPrintInfo.shared.copy() as! NSPrintInfo
+        info.horizontalPagination = .fit
+        info.verticalPagination = .automatic
+        info.isHorizontallyCentered = false
+        info.isVerticallyCentered = false
+        let margin: CGFloat = 36 // 0.5"
+        info.leftMargin = margin; info.rightMargin = margin
+        info.topMargin = margin; info.bottomMargin = margin
+
+        let contentWidth = info.paperSize.width - info.leftMargin - info.rightMargin
+        let theme = ThemeManager.shared.currentTheme
+
+        let printView = NSTextView(frame: NSRect(x: 0, y: 0, width: contentWidth, height: 1))
+        printView.isHorizontallyResizable = false
+        printView.isVerticallyResizable = true
+        printView.minSize = NSSize(width: contentWidth, height: 0)
+        printView.maxSize = NSSize(width: contentWidth, height: .greatestFiniteMagnitude)
+        printView.textContainerInset = .zero
+        printView.textContainer?.widthTracksTextView = true
+        printView.textContainer?.containerSize = NSSize(width: contentWidth, height: .greatestFiniteMagnitude)
+        printView.backgroundColor = .white
+        printView.typingAttributes = [.font: theme.editorFont, .foregroundColor: NSColor.black]
+        printView.string = textView.string
+
+        let op = NSPrintOperation(view: printView, printInfo: info)
+        op.jobTitle = documentManager.activeDocument?.fileURL?.lastPathComponent
+            ?? documentManager.activeDocument?.title ?? "Untitled"
+        if let window = window {
+            op.runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
+        } else {
+            op.run()
+        }
+    }
+
     // MARK: - External file change handling
 
     /// IDs of documents that have a pending external-change event we
@@ -969,18 +1008,32 @@ class MainWindowController: NSWindowController, NSTextViewDelegate {
 
     private func loadDocumentIntoEditor(_ doc: Document) {
         editorView.language = doc.language
-        textView.string = doc.content
-        // Reset typing attributes to clean theme defaults. The single NSTextView
-        // is reused across tabs, and its `typingAttributes` are not reset when the
-        // string changes. Markdown live preview hides markers with a 0.01pt clear
-        // font; if the caret last sat next to a hidden marker, those invisible
-        // attributes would otherwise leak into a freshly opened tab and make typed
-        // characters unreadable.
+        // Reset typing attributes to clean theme defaults *before* loading the
+        // content. The single NSTextView is reused across tabs, and setting its
+        // `.string` applies the current typing attributes to the new text.
+        // Markdown live preview hides markers with a 0.01pt clear font; if those
+        // leaked into `typingAttributes`, the freshly loaded document (and future
+        // typing) would inherit the invisible attributes.
         let theme = ThemeManager.shared.currentTheme
         textView.typingAttributes = [
             .font: theme.editorFont,
             .foregroundColor: theme.foreground
         ]
+        textView.string = doc.content
+        // Normalize the whole document to the theme defaults. `applySyntaxHighlighting`
+        // only sets attributes for languages that have highlight rules and returns
+        // early for "Normal Text", so without this a plain-text file could keep
+        // stray font/color attributes (e.g. the 0.01pt marker-hiding font used by
+        // Markdown live preview) and render invisibly — collapsing every line to
+        // near-zero height so only stacked line numbers show.
+        if let ts = textView.textStorage {
+            let full = NSRange(location: 0, length: ts.length)
+            ts.beginEditing()
+            ts.addAttribute(.font, value: theme.editorFont, range: full)
+            ts.addAttribute(.foregroundColor, value: theme.foreground, range: full)
+            ts.removeAttribute(.kern, range: full)
+            ts.endEditing()
+        }
         if doc.content.count < maxHighlightSize {
             applySyntaxHighlighting()
         }

@@ -101,6 +101,12 @@ class MenuManager {
 
         fileMenu.addItem(.separator())
 
+        fileMenu.addItem(withTitle: "Print…",
+                         action: #selector(AppDelegate.printDocument(_:)),
+                         keyEquivalent: "p")
+
+        fileMenu.addItem(.separator())
+
         fileMenu.addItem(withTitle: "Close Tab",
                          action: #selector(AppDelegate.closeTab(_:)),
                          keyEquivalent: "w")
